@@ -2,6 +2,9 @@ import requests
 import json
 import os
 from typing import List, Dict, Any, Union, TypedDict
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # API Configuration
 BASE_RUL = "https://agents-course-unit4-scoring.hf.space"
@@ -10,6 +13,9 @@ BASE_RUL = "https://agents-course-unit4-scoring.hf.space"
 QUESTIONS_DIR = "questions"
 QUESTIONS_JSON_PATH = os.path.join(QUESTIONS_DIR, "questions.json")
 ATTACHMENTS_DIR = os.path.join(QUESTIONS_DIR, "attachments")
+
+USERNAME = os.getenv("HF_USERNAME")
+AGENT_CODE = os.getenv("REPOSITORY_URL")
 
 class APIQuestion(TypedDict):
     task_id: str
