@@ -5,6 +5,17 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "arxiv>=2.2.0",
+    "html2text>=2025.4.15",
+    "langchain>=0.3.25",
+    "langchain-ollama>=0.3.3",
+    "langchain-openai>=0.3.18",
+    "langfuse>=2.60.7",
+    "langgraph>=0.4.7",
+    "markitdown[all]>=0.1.2",
+    "openai>=1.82.1",
+    "patchright>=1.52.4",
     "python-dotenv>=1.1.0",
     "requests>=2.32.3",
+    "trafilatura>=2.0.0",
 ]

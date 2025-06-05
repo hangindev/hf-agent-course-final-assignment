@@ -1,0 +1,2 @@
+from .extract_text import extract_text_with_trafilatura, extract_text_with_html2text
+from .fetch_html import fetch_html_with_patchright, fetch_html_with_trafilatura

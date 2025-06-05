@@ -1,0 +1,6 @@
+{
+  "cSpell.words": ["LANGFUSE", "markitdown", "trafilatura"],
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter"
+  }
+}
