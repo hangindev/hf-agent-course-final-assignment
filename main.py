@@ -57,9 +57,23 @@ def final_answer(answer: str):
     pass
 
 
-tools = [query_resource, search_web, search_arxiv, final_answer]
+@tool(parse_docstring=True)
+def delegate_to_research_agent():
+    """
+    Delegates the question to a research agent if the question cannot be answered with the provided information.
+    """
+    pass
+
+
+tools = [
+    query_resource,
+    search_web,
+    search_arxiv,
+    final_answer,
+]
 tools_by_name = {tool.name: tool for tool in tools}
 
+triage_model = ChatOpenAI(model="o4-mini")
 planning_model = ChatOpenAI(model="gpt-4.1")
 tool_calling_model = ChatOpenAI(model="gpt-4.1-mini")
 task_summarization_model = ChatOpenAI(model="gpt-4.1")
@@ -74,10 +88,33 @@ class AgentState(TypedDict):
     question: str
 
 
+def triage_node(state: AgentState):
+    triage_tools = [final_answer, delegate_to_research_agent]
+    response = triage_model.bind_tools(triage_tools, tool_choice="any").invoke(
+        [
+            SystemMessage(content=TRIAGE_SYSTEM_PROMPT),
+            HumanMessage(content=state["question"]),
+        ]
+    )
+
+    if response.tool_calls and response.tool_calls[0]["name"] == "final_answer":
+        return {
+            "messages": state["messages"],
+            "question": state["question"],
+            "proposed_answer": response.tool_calls[0]["args"]["answer"],
+        }
+    else:
+        # delegate_to_research_agent was called or no tool was called
+        # Pass original state through to next node
+        return state
+
+
 def plan(state: AgentState):
     response = planning_model.invoke(
-        [SystemMessage(content=PLANNING_SYSTEM_PROMPT)]
-        + [HumanMessage(content=state["question"])]
+        [
+            SystemMessage(content=PLANNING_SYSTEM_PROMPT),
+            HumanMessage(content=state["question"]),
+        ]
     )
     return {
         "messages": [HumanMessage(content=state["question"])] + [response],
@@ -133,13 +170,6 @@ def evaluate(
     }
 
 
-def should_continue(state: AgentState):
-    if state.get("proposed_answer") is not None:
-        return "Answer Proposed"
-    else:
-        return "Evaluate Outcome"
-
-
 def format_answer(state: AgentState):
     response = format_answer_model.invoke(
         [
@@ -159,29 +189,38 @@ def format_answer(state: AgentState):
 
 workflow = StateGraph(AgentState)
 
+workflow.add_node("Triage", triage_node)
 workflow.add_node("Set Action Plan", plan)
 workflow.add_node("Call tool", tool_node)
 workflow.add_node("Evaluate Outcome", evaluate)
 workflow.add_node("Format Answer", format_answer)
 
-workflow.add_edge(START, "Set Action Plan")
+workflow.add_edge(START, "Triage")
+workflow.add_conditional_edges(
+    "Triage",
+    lambda state: (
+        "Answer Proposed" if state.get("proposed_answer") is not None else "Continue"
+    ),
+    {"Answer Proposed": "Format Answer", "Continue": "Set Action Plan"},
+)
 workflow.add_edge("Set Action Plan", "Call tool")
 workflow.add_conditional_edges(
     "Call tool",
-    should_continue,
-    {
-        "Evaluate Outcome": "Evaluate Outcome",
-        "Answer Proposed": "Format Answer",
-    },
+    lambda state: (
+        "Answer Proposed" if state.get("proposed_answer") is not None else "Continue"
+    ),
+    {"Answer Proposed": "Format Answer", "Continue": "Evaluate Outcome"},
 )
 workflow.add_edge("Evaluate Outcome", "Call tool")
 workflow.add_edge("Format Answer", END)
 
 agent = workflow.compile().with_config(config={"callbacks": [langfuse_handler]})
 
-graph_png = agent.get_graph().draw_mermaid_png()
-with open("graph.png", "wb") as f:
-    f.write(graph_png)
+graph_mermaid = agent.get_graph().draw_mermaid()
+with open("graph.md", "w") as f:
+    f.write("```mermaid\n")
+    f.write(graph_mermaid)
+    f.write("```")
 
 
 def main():
@@ -258,10 +297,10 @@ def main():
         json.dump(answers, f, indent=2)
     print("Answers saved successfully.")
 
-    # print("\nSubmitting answers to the API...")
-    # submission_response = hf.submit_answers(USERNAME, AGENT_CODE, answers)
-    # print("\nSubmission result:")
-    # print(submission_response)
+    print("\nSubmitting answers to the API...")
+    submission_response = hf.submit_answers(USERNAME, AGENT_CODE, answers)
+    print("\nSubmission result:")
+    print(submission_response)
 
 
 if __name__ == "__main__":
