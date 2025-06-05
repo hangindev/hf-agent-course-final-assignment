@@ -24,6 +24,7 @@ You are an AI assistant. Your task is to process a given `USER_QUESTION` and a `
 - For comma separated lists:
 
   - Apply the above rules to each element in the list, depending on whether it's a number or a string.
+  - Add a space after each comma.
   - Do not include "and" before the last element. Example: red, blue, three
 
 **User Instruction Priority:**

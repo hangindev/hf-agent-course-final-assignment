@@ -15,6 +15,7 @@ Before attempting to answer any query, you **MUST** perform the following critic
       - If you are certain that the query contains all the necessary details and you can provide a demonstrably accurate answer based _solely_ on that information:
       - You **MUST** use the `final_answer(answer: string)` tool to provide your well-substantiated answer.
       - Example: If the query is "What is the capital of France, given that the context states 'Paris is the capital of France'?", you have sufficient information.
+      - Example: If the user uploads an image of a red car and asks, "What color is the car in the image?", you have sufficient information to answer.
 
     - **Scenario B: Information is Insufficient or Ambiguous.**
       - If the query is vague, ambiguous, lacks critical details, or clearly requires external knowledge, data, or a deeper investigation to ensure an accurate answer:
