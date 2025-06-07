@@ -20,9 +20,10 @@ from langgraph.graph import StateGraph, START, END
 from langfuse.callback import CallbackHandler
 
 from utils import load_prompt
-from tools import query_resource, search_web, search_arxiv
+from tools import query_resource, search_web, search_arxiv, delegate_to_smart_agent
 from config import (
     BASE_URL,
+    REASONING_MODEL,
     QUESTIONS_JSON_PATH,
     PREVIOUS_ANSWERS_JSON_PATH,
     ATTACHMENTS_DIR,
@@ -45,6 +46,7 @@ PLANNING_SYSTEM_PROMPT = load_prompt("planning_system_prompt.md")
 TASK_SUMMARIZATION_SYSTEM_PROMPT = load_prompt("task_summarization_prompt.md")
 EXECUTION_SYSTEM_PROMPT = load_prompt("execution_system_prompt.md")
 FORMAT_ANSWER_SYSTEM_PROMPT = load_prompt("format_answer_system_prompt.md")
+REASONING_SYSTEM_PROMPT = load_prompt("reasoning_system_prompt.md")
 
 
 @tool(parse_docstring=True)
@@ -99,7 +101,7 @@ class AgentState(TypedDict):
 
 
 def triage_node(state: AgentState):
-    triage_tools = [final_answer, delegate_to_research_agent, delegate_to_audio_agent]
+    triage_tools = [final_answer, delegate_to_research_agent, delegate_to_audio_agent, delegate_to_smart_agent]
     response = triage_model.bind_tools(triage_tools, tool_choice="any").invoke(
         [
             SystemMessage(content=TRIAGE_SYSTEM_PROMPT),
@@ -122,6 +124,22 @@ def triage_node(state: AgentState):
             {"file_path": state.get("file_path"), "question": state["question"]}
         )
         return {**state, "proposed_answer": response["answer"]}
+
+    if (
+        response.tool_calls
+        and response.tool_calls[0]["name"] == "delegate_to_smart_agent"
+    ):
+        reasoning_response = REASONING_MODEL.invoke(
+            [
+                SystemMessage(content=REASONING_SYSTEM_PROMPT),
+                HumanMessage(content=state["question"]),
+            ]
+        )
+        return {
+            "messages": state["messages"],
+            "question": state["question"],
+            "proposed_answer": reasoning_response.content,
+        }
 
     return state
 

@@ -5,6 +5,8 @@ Configuration settings for the Hugging Face Agents Course Final Assignment.
 import os
 from dotenv import load_dotenv
 
+from langchain_openai import ChatOpenAI
+
 # Environment variables
 load_dotenv()
 USERNAME = os.getenv("HF_USERNAME")
@@ -15,6 +17,9 @@ LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY")
 LANGFUSE_HOST = os.getenv("LANGFUSE_HOST")
 
 BRAVE_SEARCH_API_KEY = os.getenv("BRAVE_SEARCH_API_KEY")
+
+# Reasoning model
+REASONING_MODEL = ChatOpenAI(model="o4-mini")
 
 # API Configuration
 BASE_URL = "https://agents-course-unit4-scoring.hf.space"
