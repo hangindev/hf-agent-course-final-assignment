@@ -32,6 +32,7 @@ from config import (
     USERNAME,
     AGENT_CODE,
 )
+from graphs.audio_agent import audio_agent
 
 recursion_limit = 20
 
@@ -65,6 +66,14 @@ def delegate_to_research_agent():
     pass
 
 
+@tool(parse_docstring=True)
+def delegate_to_audio_agent():
+    """
+    Delegates the question to an audio agent if the question is related to an audio file.
+    """
+    pass
+
+
 tools = [
     query_resource,
     search_web,
@@ -86,10 +95,11 @@ class AgentState(TypedDict):
     proposed_answer: Optional[str]
     final_answer: Optional[str]
     question: str
+    file_path: Optional[str]
 
 
 def triage_node(state: AgentState):
-    triage_tools = [final_answer, delegate_to_research_agent]
+    triage_tools = [final_answer, delegate_to_research_agent, delegate_to_audio_agent]
     response = triage_model.bind_tools(triage_tools, tool_choice="any").invoke(
         [
             SystemMessage(content=TRIAGE_SYSTEM_PROMPT),
@@ -103,10 +113,17 @@ def triage_node(state: AgentState):
             "question": state["question"],
             "proposed_answer": response.tool_calls[0]["args"]["answer"],
         }
-    else:
-        # delegate_to_research_agent was called or no tool was called
-        # Pass original state through to next node
-        return state
+
+    if (
+        response.tool_calls
+        and response.tool_calls[0]["name"] == "delegate_to_audio_agent"
+    ):
+        response = audio_agent.invoke(
+            {"file_path": state.get("file_path"), "question": state["question"]}
+        )
+        return {**state, "proposed_answer": response["answer"]}
+
+    return state
 
 
 def plan(state: AgentState):
@@ -254,6 +271,7 @@ def main():
         print(f"❓ {question['question']} (Expected answer: {expected_answer})")
         content = [{"type": "text", "text": question["question"]}]
         file_path = question["file_path"]
+
         if file_path.endswith(
             (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp")
         ):
@@ -274,6 +292,7 @@ def main():
                     "question": question["question"],
                     "proposed_answer": None,
                     "final_answer": None,
+                    "file_path": file_path,
                 },
                 config={"recursion_limit": recursion_limit},
             )

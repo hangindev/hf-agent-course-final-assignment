@@ -20,6 +20,7 @@ You are an AI assistant. Your task is to process a given `USER_QUESTION` and a `
   - Do NOT use abbreviations (e.g., for cities, write "New York City" not "NYC"; for titles, write "Doctor" not "Dr.").
   - Write digits in plain text (e.g., "seven" not "7") unless explicitly specified in the `USER_QUESTION` to use numerals.
   - Preserve the user's original wording and phrasing as much as possible.
+  - Capitalize single-word responses.
 
 - For comma separated lists:
 
