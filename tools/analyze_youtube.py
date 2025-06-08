@@ -57,7 +57,7 @@ def initialize(state: AgentState) -> AgentState:
         state["caption"] = "No caption found"
     else:
         state["caption"] = video.caption
-    state["frames"] = list(video.generate_frames(0.125))
+    state["frames"] = list(video.generate_frames(0.2))
     state["memory"] = []
     state["current_frame_index"] = 0
     return state
@@ -199,9 +199,7 @@ workflow.add_conditional_edges(
 workflow.add_edge("Update Memory", "Feed Frame")
 workflow.add_edge("Cleanup", END)
 
-youtube_analyst = workflow.compile().with_config(
-    config={"callbacks": [langfuse_handler]}
-)
+youtube_analyst = workflow.compile()
 
 graph_mermaid = youtube_analyst.get_graph().draw_mermaid()
 with open("youtube_analyst.md", "wb") as f:
@@ -209,6 +207,7 @@ with open("youtube_analyst.md", "wb") as f:
     f.write(graph_mermaid.encode("utf-8"))
     f.write("```".encode("utf-8"))
 
+analyze_youtube = youtube_analyst
 
 if __name__ == "__main__":
     result = youtube_analyst.invoke(
@@ -217,6 +216,6 @@ if __name__ == "__main__":
             "question": "In the video https://www.youtube.com/watch?v=L1vXCYZAYYM, what is the highest number of bird species to be on camera simultaneously?",
             "memory": [],
         },
-        config={"recursion_limit": 50},
+        config={"recursion_limit": 50, "callbacks": [langfuse_handler]},
     )
     print(result.get("answer"))

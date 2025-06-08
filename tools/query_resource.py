@@ -20,6 +20,9 @@ def extract_markdown(url: str) -> str:
         md = MarkItDown()
         pdf_response = requests.get(url, timeout=10)
 
+        if len(pdf_response.content) > 10 * 1024 * 1024:
+            return "File too large"
+
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as temp_file:
             temp_file.write(pdf_response.content)
             temp_path = temp_file.name

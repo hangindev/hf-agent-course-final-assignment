@@ -20,7 +20,7 @@ from langgraph.graph import StateGraph, START, END
 from langfuse.callback import CallbackHandler
 
 from utils import load_prompt
-from tools import query_resource, search_web, search_arxiv
+from tools import query_resource, search_web, search_arxiv, analyze_youtube
 from config import (
     BASE_URL,
     QUESTIONS_JSON_PATH,
@@ -34,7 +34,7 @@ from config import (
 )
 from graphs.audio_agent import audio_agent
 
-recursion_limit = 20
+recursion_limit = 30
 
 langfuse_handler = CallbackHandler(
     secret_key=LANGFUSE_SECRET_KEY, public_key=LANGFUSE_PUBLIC_KEY, host=LANGFUSE_HOST
@@ -74,6 +74,17 @@ def delegate_to_audio_agent():
     pass
 
 
+@tool(parse_docstring=True)
+def delegate_to_youtube_agent(youtube_url: str):
+    """
+    Delegates the question to a youtube agent if the question is related to a youtube video.
+
+    Args:
+        youtube_url: The URL of the youtube video.
+    """
+    pass
+
+
 tools = [
     query_resource,
     search_web,
@@ -82,7 +93,7 @@ tools = [
 ]
 tools_by_name = {tool.name: tool for tool in tools}
 
-triage_model = ChatOpenAI(model="o4-mini")
+triage_model = ChatOpenAI(model="gpt-4.1")
 planning_model = ChatOpenAI(model="gpt-4.1")
 tool_calling_model = ChatOpenAI(model="gpt-4.1-mini")
 task_summarization_model = ChatOpenAI(model="gpt-4.1")
@@ -99,7 +110,12 @@ class AgentState(TypedDict):
 
 
 def triage_node(state: AgentState):
-    triage_tools = [final_answer, delegate_to_research_agent, delegate_to_audio_agent]
+    triage_tools = [
+        final_answer,
+        delegate_to_research_agent,
+        delegate_to_audio_agent,
+        delegate_to_youtube_agent,
+    ]
     response = triage_model.bind_tools(triage_tools, tool_choice="any").invoke(
         [
             SystemMessage(content=TRIAGE_SYSTEM_PROMPT),
@@ -123,6 +139,20 @@ def triage_node(state: AgentState):
         )
         return {**state, "proposed_answer": response["answer"]}
 
+    if (
+        response.tool_calls
+        and response.tool_calls[0]["name"] == "delegate_to_youtube_agent"
+    ):
+        response = analyze_youtube.invoke(
+            {
+                "url": response.tool_calls[0]["args"]["youtube_url"],
+                "question": state["question"],
+                "memory": [],
+            },
+            config={"recursion_limit": 50},
+        )
+        return {**state, "proposed_answer": response["answer"]}
+
     return state
 
 
@@ -133,11 +163,7 @@ def plan(state: AgentState):
             HumanMessage(content=state["question"]),
         ]
     )
-    return {
-        "messages": [HumanMessage(content=state["question"])] + [response],
-        "question": state["question"],
-        "proposed_answer": state.get("proposed_answer"),
-    }
+    return {**state, "messages": [HumanMessage(content=state["question"])] + [response]}
 
 
 def tool_node(state: AgentState):
@@ -166,11 +192,7 @@ def tool_node(state: AgentState):
             )
         )
 
-    return {
-        "messages": state["messages"] + outputs,
-        "question": state["question"],
-        "proposed_answer": state.get("proposed_answer"),
-    }
+    return {**state, "messages": state["messages"] + outputs}
 
 
 def evaluate(
@@ -180,11 +202,7 @@ def evaluate(
         state["messages"] + [SystemMessage(TASK_SUMMARIZATION_SYSTEM_PROMPT)]
     )
 
-    return {
-        "messages": state["messages"] + [response],
-        "question": state["question"],
-        "proposed_answer": state.get("proposed_answer"),
-    }
+    return {**state, "messages": state["messages"] + [response]}
 
 
 def format_answer(state: AgentState):
@@ -196,12 +214,15 @@ def format_answer(state: AgentState):
             ),
         ]
     )
-    return {
-        "messages": state["messages"],
-        "question": state["question"],
-        "proposed_answer": state.get("proposed_answer"),
-        "final_answer": response.content,
-    }
+    answer = response.content
+
+    if answer and not answer[-1].isalnum():
+        answer = answer[:-1]
+
+    if answer and len(answer) > 0 and answer[0].isalpha() and "," not in answer:
+        answer = answer[0].upper() + answer[1:]
+
+    return {**state, "final_answer": answer}
 
 
 workflow = StateGraph(AgentState)

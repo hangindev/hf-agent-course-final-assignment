@@ -8,7 +8,7 @@ from langchain_core.messages import (
 )
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, START, END
-from langfuse.openai import OpenAI
+from openai import OpenAI
 
 from utils import load_prompt
 
@@ -31,7 +31,7 @@ def transcribe_audio(state: AgentState):
     audio_file = open(state["file_path"], "rb")
 
     transcription = client.audio.transcriptions.create(
-        model="gpt-4o-mini-transcribe", file=audio_file
+        model="gpt-4o-transcribe", file=audio_file
     )
 
     return {**state, "transcript": transcription.text}

@@ -18,9 +18,10 @@ You are an AI assistant. Your task is to process a given `USER_QUESTION` and a `
 
   - Do NOT use articles (e.g., "a", "an", "the").
   - Do NOT use abbreviations (e.g., for cities, write "New York City" not "NYC"; for titles, write "Doctor" not "Dr.").
-  - Write digits in plain text (e.g., "seven" not "7") unless explicitly specified in the `USER_QUESTION` to use numerals.
+  - Use Arabic numerals for numbers (e.g., "7" instead of "seven").
   - Preserve the user's original wording and phrasing as much as possible.
-  - Capitalize single-word responses.
+  - Properly capitalize the response (e.g. "paris" to "Paris", or "new york city" to "New York City").
+  - Do not end the response with punctuation like '.', '!', or '?'.
 
 - For comma separated lists:
 
